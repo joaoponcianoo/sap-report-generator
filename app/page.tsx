@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { UI5Table } from "@/components/ui5-table";
 import { FioriPreviewFrame } from "@/components/fiori-preview-frame";
 import { AppLayout } from "@/components/app-layout";
 import { generateMockData } from "@/lib/mockDataGenerator";
@@ -284,24 +283,6 @@ export default function Home() {
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Report Preview */}
-          {reportConfig && (
-            <Card>
-              <CardHeader>
-                <CardTitle>UI5 Report Preview</CardTitle>
-                <CardDescription>
-                  Preview of your report with generated mock data
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <UI5Table
-                  fields={reportConfig.fields}
-                  data={reportConfig.mockData}
-                />
               </CardContent>
             </Card>
           )}

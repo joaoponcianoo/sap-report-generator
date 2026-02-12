@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "./header";
 import { Sidebar } from "./sidebar";
 import { MobileSidebar } from "./mobile-sidebar";
+import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,12 +12,22 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Desktop Sidebar - Fixed width */}
-      <aside className="hidden md:block w-60 shrink-0">
-        <Sidebar />
+      {/* Desktop Sidebar */}
+      <aside
+        className={cn(
+          "hidden md:block shrink-0 transition-all duration-200",
+          sidebarCollapsed ? "w-16" : "w-60",
+        )}
+      >
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+          showCollapseButton
+        />
       </aside>
 
       {/* Mobile Sidebar */}

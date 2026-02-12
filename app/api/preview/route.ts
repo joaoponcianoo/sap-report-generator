@@ -16,6 +16,7 @@ interface PreviewColumnMeta {
   key: string;
   label: string;
   type: FieldMapping["type"];
+  enumValues?: string[];
 }
 
 const DEFAULT_FALLBACK_FIELDS: FieldMapping[] = [
@@ -269,6 +270,7 @@ function buildPreviewColumns(fields: FieldMapping[]): PreviewColumnMeta[] {
     key: sanitizeBindingKey(field.cdsField || field.displayName),
     label: field.displayName,
     type: field.type,
+    enumValues: field.enumValues,
   }));
 }
 

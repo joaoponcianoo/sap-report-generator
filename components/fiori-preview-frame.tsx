@@ -97,7 +97,7 @@ export function FioriPreviewFrame({
 
   return (
     <div className={className}>
-      <div className="relative min-h-[520px] rounded-lg border border-sap-border bg-white">
+      <div className="relative min-h-130 rounded-lg border border-sap-border bg-white">
         {status !== "ready" && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90">
             {status === "loading" ? (
@@ -106,7 +106,7 @@ export function FioriPreviewFrame({
                 Loading Fiori sandbox...
               </div>
             ) : (
-              <div className="max-w-[420px] p-4 text-center">
+              <div className="max-w-105 p-4 text-center">
                 <div className="mb-2 flex items-center justify-center gap-2 text-red-600">
                   <TriangleAlert className="h-4 w-4" />
                   <span className="text-sm font-medium">
@@ -122,7 +122,7 @@ export function FioriPreviewFrame({
           ref={iframeRef}
           title="Fiori App Preview"
           src={src}
-          className="h-[520px] w-full rounded-lg"
+          className="h-130 w-full rounded-lg"
           sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
           loading="lazy"
         />

@@ -98,10 +98,43 @@ function buildPreviewHtml(previewId: string, preview: {
             "sap/m/Label",
             "sap/m/ColumnListItem",
             "sap/m/Text",
-            "sap/ui/model/json/JSONModel"
-          ], function (Page, Table, Column, Label, ColumnListItem, Text, JSONModel) {
+            "sap/m/SearchField",
+            "sap/m/Select",
+            "sap/ui/core/Item",
+            "sap/m/Button",
+            "sap/m/FlexBox",
+            "sap/m/VBox",
+            "sap/m/Toolbar",
+            "sap/m/ToolbarSpacer",
+            "sap/ui/model/json/JSONModel",
+            "sap/ui/model/Filter"
+          ], function (
+            Page,
+            Table,
+            Column,
+            Label,
+            ColumnListItem,
+            Text,
+            SearchField,
+            Select,
+            Item,
+            Button,
+            FlexBox,
+            VBox,
+            Toolbar,
+            ToolbarSpacer,
+            JSONModel,
+            Filter
+          ) {
             try {
+              const items = Array.isArray(PREVIEW?.modelData?.items)
+                ? PREVIEW.modelData.items
+                : [];
+              const totalCount = items.length;
+              const filterState = {};
+
               const table = new Table();
+              table.setModel(new JSONModel(PREVIEW.modelData || {}));
 
               columns.forEach(function (columnMeta) {
                 table.addColumn(
@@ -119,12 +152,164 @@ function buildPreviewHtml(previewId: string, preview: {
 
               table.bindItems("/items", template);
 
+              function getFilterOptions(columnMeta) {
+                if (Array.isArray(columnMeta.enumValues) && columnMeta.enumValues.length > 0) {
+                  return columnMeta.enumValues.map(function (value) {
+                    return String(value);
+                  });
+                }
+
+                const values = new Set();
+                items.forEach(function (row) {
+                  const value = row?.[columnMeta.key];
+                  if (value !== undefined && value !== null && String(value).trim() !== "") {
+                    values.add(String(value));
+                  }
+                });
+
+                return Array.from(values).sort();
+              }
+
+              const resultText = new Text({
+                text: "Showing " + totalCount + " of " + totalCount
+              });
+
+              function applyFilters() {
+                const binding = table.getBinding("items");
+                if (!binding) {
+                  return;
+                }
+
+                const activeFilters = columns
+                  .map(function (columnMeta) {
+                    const rawFilter = filterState[columnMeta.key];
+                    if (rawFilter === undefined || rawFilter === null || String(rawFilter).trim() === "") {
+                      return null;
+                    }
+
+                    const normalizedFilter = String(rawFilter).trim().toLowerCase();
+                    return new Filter({
+                      path: String(columnMeta.key),
+                      test: function (candidateValue) {
+                        if (candidateValue === undefined || candidateValue === null) {
+                          return false;
+                        }
+
+                        const normalizedCandidate = String(candidateValue).toLowerCase();
+                        if (columnMeta.type === "enum" || columnMeta.type === "boolean") {
+                          return normalizedCandidate === normalizedFilter;
+                        }
+
+                        return normalizedCandidate.indexOf(normalizedFilter) !== -1;
+                      }
+                    });
+                  })
+                  .filter(Boolean);
+
+                binding.filter(activeFilters);
+                resultText.setText("Showing " + binding.getLength() + " of " + totalCount);
+              }
+
+              const filtersContainer = new FlexBox({
+                wrap: "Wrap",
+                renderType: "Div"
+              });
+              filtersContainer.addStyleClass("sapUiSmallMarginTop sapUiSmallMarginBottom");
+
+              columns.forEach(function (columnMeta) {
+                const filterLabel = new Label({
+                  text: String(columnMeta.label || columnMeta.key)
+                });
+
+                let filterControl;
+                if (columnMeta.type === "enum" || columnMeta.type === "boolean") {
+                  filterControl = new Select({
+                    width: "13rem",
+                    items: [new Item({ key: "", text: "All" })]
+                  });
+
+                  const options = columnMeta.type === "boolean"
+                    ? ["true", "false"]
+                    : getFilterOptions(columnMeta);
+
+                  options.forEach(function (option) {
+                    filterControl.addItem(
+                      new Item({
+                        key: String(option),
+                        text: String(option)
+                      })
+                    );
+                  });
+
+                  filterControl.attachChange(function (event) {
+                    filterState[columnMeta.key] = event.getSource().getSelectedKey();
+                    applyFilters();
+                  });
+                } else {
+                  filterControl = new SearchField({
+                    width: "13rem",
+                    placeholder: "Filter " + String(columnMeta.label || columnMeta.key),
+                    liveChange: function (event) {
+                      filterState[columnMeta.key] = event.getParameter("newValue") || "";
+                      applyFilters();
+                    },
+                    search: function (event) {
+                      filterState[columnMeta.key] = event.getParameter("query") || "";
+                      applyFilters();
+                    }
+                  });
+                }
+
+                const filterBox = new VBox({
+                  width: "13rem",
+                  items: [filterLabel, filterControl]
+                });
+                filterBox.addStyleClass("sapUiSmallMarginEnd sapUiSmallMarginBottom");
+                filtersContainer.addItem(filterBox);
+              });
+
+              const clearButton = new Button({
+                text: "Clear Filters",
+                press: function () {
+                  Object.keys(filterState).forEach(function (key) {
+                    filterState[key] = "";
+                  });
+
+                  filtersContainer.getItems().forEach(function (item) {
+                    const controls = item.getItems();
+                    const control = controls[1];
+                    if (control && typeof control.setValue === "function") {
+                      control.setValue("");
+                    }
+                    if (control && typeof control.setSelectedKey === "function") {
+                      control.setSelectedKey("");
+                    }
+                  });
+
+                  applyFilters();
+                }
+              });
+
+              const filtersToolbar = new Toolbar({
+                content: [
+                  new Text({ text: "Filters" }),
+                  new ToolbarSpacer(),
+                  resultText,
+                  clearButton
+                ]
+              });
+
+              const content = new VBox({
+                items: [filtersToolbar, filtersContainer, table]
+              });
+              content.addStyleClass("sapUiSmallMargin");
+
               const page = new Page({
                 title: PREVIEW.name || "AI Report Preview",
-                content: [table]
+                content: [content]
               });
-              page.setModel(new JSONModel(PREVIEW.modelData || {}));
               page.placeAt("content");
+              applyFilters();
               notifyParent("ready");
             } catch (generatedError) {
               notifyParent("error", "Generated table rendering failed: " + String(generatedError));
