@@ -1,4 +1,8 @@
 import type { FieldMapping } from "@/lib/types";
+import {
+  type PreviewControllerConfig,
+  normalizePreviewControllerConfig,
+} from "@/lib/preview/controllerConfig";
 
 export interface CreatePreviewRequest {
   name?: string;
@@ -6,6 +10,7 @@ export interface CreatePreviewRequest {
   filterFields?: FieldMapping[];
   mockData?: Record<string, unknown>[];
   viewXml?: string;
+  controller?: unknown;
   controllerJs?: string;
   modelData?: Record<string, unknown>;
 }
@@ -19,7 +24,7 @@ interface PreviewColumnMeta {
 interface GeneratedPreviewPayload {
   name: string;
   viewXml: string;
-  controllerJs: string;
+  controller: PreviewControllerConfig;
   modelData: Record<string, unknown>;
 }
 
@@ -300,7 +305,15 @@ export function buildPreviewPayload(
     return {
       ok: false,
       error:
-        "Provide either (viewXml/controllerJs) or a non-empty fields array",
+        "Provide either (viewXml) or a non-empty fields array",
+    };
+  }
+
+  if (typeof body.controllerJs === "string" && body.controllerJs.trim().length > 0) {
+    return {
+      ok: false,
+      error:
+        "controllerJs is disabled for security reasons. Use the declarative controller object instead.",
     };
   }
 
@@ -313,7 +326,7 @@ export function buildPreviewPayload(
   const generatedViewXml = hasDirectUi5Content
     ? (body.viewXml ?? "")
     : buildDefaultViewXml(fields);
-  const generatedControllerJs = body.controllerJs ?? "";
+  const generatedController = normalizePreviewControllerConfig(body.controller);
   const generatedModelData =
     body.modelData ??
     ({
@@ -330,7 +343,7 @@ export function buildPreviewPayload(
     payload: {
       name: body.name?.trim() || "Generated Report Preview",
       viewXml: generatedViewXml,
-      controllerJs: generatedControllerJs,
+      controller: generatedController,
       modelData: generatedModelData,
     },
   };

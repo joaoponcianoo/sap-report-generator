@@ -18,14 +18,14 @@ export async function POST(req: NextRequest) {
     const preview = createPreviewEntry({
       name: buildResult.payload.name,
       viewXml: buildResult.payload.viewXml,
-      controllerJs: buildResult.payload.controllerJs,
+      controller: buildResult.payload.controller,
       modelData: buildResult.payload.modelData,
     });
 
     const previewToken = createPreviewToken({
       name: preview.name,
       viewXml: preview.viewXml,
-      controllerJs: preview.controllerJs,
+      controller: preview.controller,
       modelData: preview.modelData,
       createdAt: preview.createdAt,
     });

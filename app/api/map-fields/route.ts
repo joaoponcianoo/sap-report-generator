@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await generateFieldMappings({
-      prompt,
+      prompt: prompt,
       forceMock: body.forceMock === true || process.env.MOCK_AI === "true",
       apiKey: process.env.OPENAI_API_KEY?.trim(),
       model: process.env.OPENAI_MODEL?.trim(),

@@ -26,7 +26,7 @@ export async function GET(
   const html = buildPreviewHtml(params.id, {
     name: preview.name,
     viewXml: preview.viewXml,
-    controllerJs: preview.controllerJs,
+    controller: preview.controller,
     modelData: preview.modelData,
   });
 

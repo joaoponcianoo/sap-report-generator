@@ -1,20 +1,38 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import {
+  type PreviewControllerConfig,
+  normalizePreviewControllerConfig,
+} from "@/lib/preview/controllerConfig";
 
 export interface PreviewPayload {
+  name: string;
+  viewXml: string;
+  controller: PreviewControllerConfig;
+  modelData: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface SignedPreviewPayloadV2 extends PreviewPayload {
+  v: 2;
+  exp: number;
+}
+
+interface SignedPreviewPayloadV1 {
   name: string;
   viewXml: string;
   controllerJs: string;
   modelData: Record<string, unknown>;
   createdAt: string;
-}
-
-interface SignedPreviewPayload extends PreviewPayload {
   v: 1;
   exp: number;
 }
 
 const DEFAULT_TTL_SECONDS = 60 * 60;
 const SECRET_FALLBACK = "local-preview-secret-change-in-production";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 function getSecret(): string {
   return process.env.PREVIEW_TOKEN_SECRET || SECRET_FALLBACK;
@@ -38,9 +56,9 @@ export function createPreviewToken(
   payload: PreviewPayload,
   ttlSeconds = DEFAULT_TTL_SECONDS,
 ): string {
-  const signedPayload: SignedPreviewPayload = {
+  const signedPayload: SignedPreviewPayloadV2 = {
     ...payload,
-    v: 1,
+    v: 2,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
   };
 
@@ -48,6 +66,28 @@ export function createPreviewToken(
   const signature = signPayload(payloadBase64Url);
 
   return `${payloadBase64Url}.${signature}`;
+}
+
+function isValidCommonFields(
+  parsed: Record<string, unknown>,
+  nowUnix: number,
+): parsed is {
+  name: string;
+  viewXml: string;
+  modelData: Record<string, unknown>;
+  createdAt: string;
+  exp: number;
+  v: number;
+} {
+  return (
+    typeof parsed.v === "number" &&
+    typeof parsed.exp === "number" &&
+    parsed.exp >= nowUnix &&
+    typeof parsed.name === "string" &&
+    typeof parsed.viewXml === "string" &&
+    typeof parsed.createdAt === "string" &&
+    isRecord(parsed.modelData)
+  );
 }
 
 export function parsePreviewToken(token: string): PreviewPayload | null {
@@ -68,28 +108,43 @@ export function parsePreviewToken(token: string): PreviewPayload | null {
   }
 
   try {
-    const parsed = JSON.parse(fromBase64Url(payloadBase64Url)) as Partial<SignedPreviewPayload>;
-    if (
-      parsed.v !== 1 ||
-      typeof parsed.exp !== "number" ||
-      parsed.exp < Math.floor(Date.now() / 1000) ||
-      typeof parsed.name !== "string" ||
-      typeof parsed.viewXml !== "string" ||
-      typeof parsed.controllerJs !== "string" ||
-      typeof parsed.createdAt !== "string" ||
-      typeof parsed.modelData !== "object" ||
-      parsed.modelData === null
-    ) {
+    const parsed = JSON.parse(fromBase64Url(payloadBase64Url)) as Record<
+      string,
+      unknown
+    >;
+    const nowUnix = Math.floor(Date.now() / 1000);
+
+    if (!isValidCommonFields(parsed, nowUnix)) {
       return null;
     }
 
-    return {
-      name: parsed.name,
-      viewXml: parsed.viewXml,
-      controllerJs: parsed.controllerJs,
-      modelData: parsed.modelData as Record<string, unknown>,
-      createdAt: parsed.createdAt,
-    };
+    if (parsed.v === 2) {
+      return {
+        name: parsed.name,
+        viewXml: parsed.viewXml,
+        controller: normalizePreviewControllerConfig(
+          (parsed as Record<string, unknown>).controller,
+        ),
+        modelData: parsed.modelData,
+        createdAt: parsed.createdAt,
+      };
+    }
+
+    if (
+      parsed.v === 1 &&
+      typeof (parsed as Record<string, unknown>).controllerJs === "string"
+    ) {
+      const legacy = parsed as unknown as SignedPreviewPayloadV1;
+      return {
+        name: legacy.name,
+        viewXml: legacy.viewXml,
+        controller: normalizePreviewControllerConfig(null),
+        modelData: legacy.modelData,
+        createdAt: legacy.createdAt,
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }

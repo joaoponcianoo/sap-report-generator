@@ -40,10 +40,10 @@ Goal:
 Hard rules:
 - Return only JSON that matches the schema.
 - Output fields only. Never output report title.
-- Keep displayName in the user's language.
+- Keep displayName in English.
 - Keep displayName concise (usually 1 to 4 words), no full sentence.
 - When the prompt explicitly lists fields, preserve the same field order.
-- Do not include command text as a field (examples: "quero um relatório", "create report", "show me").
+- Do not include command text as a field (examples: "create report", "show me", "generate report").
 - Do not merge different requested fields into one field.
 - Do not invent unrelated fields.
 - Avoid duplicates.
@@ -105,10 +105,13 @@ const DEFAULT_FIELDS: FieldMapping[] = [
 ];
 
 const COMMON_PROMPT_NOISE = [
-  "quero um relatorio",
+  "create report",
   "create a report",
+  "generate report",
+  "generate a report",
   "show me",
   "i need a report",
+  "please create a report",
 ];
 
 function toTitleCase(value: string): string {
@@ -141,9 +144,9 @@ function toCdsFieldName(value: string): string {
 }
 
 function parseRequestedFields(prompt: string): string[] {
-  const preferredSegment = prompt.match(/\b(with|com)\b([\s\S]*)/i)?.[2] ?? prompt;
+  const preferredSegment = prompt.match(/\bwith\b([\s\S]*)/i)?.[1] ?? prompt;
   const normalized = preferredSegment
-    .replace(/\b(and|e)\b/gi, ",")
+    .replace(/\band\b/gi, ",")
     .replace(/\./g, ",")
     .replace(/\s+/g, " ");
 
@@ -152,11 +155,8 @@ function parseRequestedFields(prompt: string): string[] {
     .map((token) =>
       token
         .trim()
-        .replace(
-          /^(a|an|the|um|uma|o|a|quero|preciso|crie|gere|de|do|da|dos|das)\s+/i,
-          "",
-        )
-        .replace(/\s+(fields?|campos?)$/i, "")
+        .replace(/^(a|an|the|please|i|we|need|want|create|generate|show)\s+/i, "")
+        .replace(/\s+fields?$/i, "")
         .trim(),
     )
     .filter(Boolean);

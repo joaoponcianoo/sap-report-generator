@@ -29,9 +29,7 @@ function shouldDefaultAsFilter(field: FieldMapping, index: number): boolean {
     return true;
   }
 
-  return (
-    /status|date|customer|order|pedido|cliente|data/.test(name) || index < 2
-  );
+  return /status|date|customer|order/.test(name) || index < 2;
 }
 
 function uniqueFields(fields: FieldMapping[]): FieldMapping[] {
@@ -219,7 +217,8 @@ export default function Home() {
   };
 
   const examplePrompts = [
-    "Quero um relatório de vendas com Pedido, Item, Quantidade, Status e Data de Entrega",
+    "Create a sales report with Sales Order, Item, Quantity, Status, and Delivery Date",
+    "Create a purchasing report with Supplier, Material, Net Amount, Currency, and Posting Date",
     "Show me Sales Order, Material, Quantity, Price and Total Amount",
   ];
 
@@ -233,7 +232,7 @@ export default function Home() {
             </h2>
             <p className="text-muted-foreground">
               Step 1: describe the report. Step 2: choose title, table fields,
-              and filter fields.
+              and filter fields. Use English prompts for best mapping accuracy.
             </p>
           </div>
 

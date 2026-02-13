@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
+import type { PreviewControllerConfig } from "@/lib/preview/controllerConfig";
 
 export interface PreviewEntry {
   id: string;
   name: string;
   viewXml: string;
-  controllerJs: string;
+  controller: PreviewControllerConfig;
   modelData: Record<string, unknown>;
   createdAt: string;
 }
