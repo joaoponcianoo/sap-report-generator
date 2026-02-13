@@ -1,11 +1,10 @@
-export type FieldType = "string" | "number" | "date" | "boolean" | "enum";
+export type FieldType = "string" | "number" | "date" | "boolean";
 
 export interface FieldMapping {
   displayName: string;
   cdsField: string;
   cdsView: string;
   type: FieldType;
-  enumValues?: string[];
 }
 
 export interface ReportConfig {

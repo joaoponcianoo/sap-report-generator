@@ -3,11 +3,11 @@ import { FieldMapping } from "./types";
 export function generateMockData(
   fields: FieldMapping[],
   rowCount: number = 10,
-): Record<string, any>[] {
-  const data: Record<string, any>[] = [];
+): Record<string, unknown>[] {
+  const data: Record<string, unknown>[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const row: Record<string, any> = {};
+    const row: Record<string, unknown> = {};
 
     fields.forEach((field) => {
       row[field.displayName] = generateMockValue(field, i);
@@ -19,8 +19,8 @@ export function generateMockData(
   return data;
 }
 
-function generateMockValue(field: FieldMapping, index: number): any {
-  const { type, displayName, enumValues } = field;
+function generateMockValue(field: FieldMapping, index: number): unknown {
+  const { type, displayName } = field;
 
   switch (type) {
     case "string":
@@ -30,16 +30,10 @@ function generateMockValue(field: FieldMapping, index: number): any {
       return generateNumberValue(displayName, index);
 
     case "date":
-      return generateDateValue(index);
+      return generateDateValue();
 
     case "boolean":
       return index % 2 === 0;
-
-    case "enum":
-      if (enumValues && enumValues.length > 0) {
-        return enumValues[index % enumValues.length];
-      }
-      return generateEnumValue(displayName, index);
 
     default:
       return `Value ${index + 1}`;
@@ -126,28 +120,10 @@ function generateNumberValue(fieldName: string, index: number): number {
   return Math.floor(Math.random() * 1000) + 1;
 }
 
-function generateDateValue(index: number): string {
+function generateDateValue(): string {
   const now = new Date();
   const daysOffset = Math.floor(Math.random() * 90) - 45;
   const date = new Date(now.getTime() + daysOffset * 24 * 60 * 60 * 1000);
   return date.toISOString().split("T")[0];
 }
 
-function generateEnumValue(fieldName: string, index: number): string {
-  const lowerName = fieldName.toLowerCase();
-
-  if (lowerName.includes("status")) {
-    const statuses = ["Open", "In Progress", "Completed", "Cancelled"];
-    return statuses[index % statuses.length];
-  }
-  if (lowerName.includes("priority")) {
-    const priorities = ["Low", "Medium", "High", "Critical"];
-    return priorities[index % priorities.length];
-  }
-  if (lowerName.includes("type") || lowerName.includes("category")) {
-    const types = ["Type A", "Type B", "Type C"];
-    return types[index % types.length];
-  }
-
-  return `Option ${(index % 3) + 1}`;
-}
