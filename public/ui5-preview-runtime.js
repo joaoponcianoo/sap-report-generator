@@ -1,6 +1,7 @@
 (function (global) {
   "use strict";
 
+  // Canal unico para enviar status do iframe para o app principal.
   function notifyParent(preview, status, errorMessage) {
     if (!global.parent) {
       return;
@@ -18,6 +19,10 @@
   }
 
   function startPreview(preview) {
+    // Quando __smartTableOData existe, usamos caminho SmartTable + OData V2.
+    // Sem isso, caimos para tabela gerada manualmente (JSONModel).
+    var smartTableOData =
+      preview && preview.modelData && preview.modelData.__smartTableOData;
     var columns = Array.isArray(
       preview && preview.modelData && preview.modelData.__previewColumns,
     )
@@ -29,6 +34,176 @@
       ? preview.modelData.__previewFilters
       : columns;
 
+    if (
+      smartTableOData &&
+      typeof smartTableOData.serviceUrl === "string" &&
+      typeof smartTableOData.entitySet === "string" &&
+      smartTableOData.serviceUrl.trim() &&
+      smartTableOData.entitySet.trim()
+    ) {
+      // Modo principal de validacao UX: SmartFilterBar + SmartTable.
+      sap.ui.require(
+        [
+          "sap/m/Page",
+          "sap/m/VBox",
+          "sap/ui/model/odata/v2/ODataModel",
+          "sap/ui/comp/smartfilterbar/SmartFilterBar",
+          "sap/ui/comp/smartfilterbar/ControlConfiguration",
+          "sap/ui/comp/smarttable/SmartTable",
+        ],
+        function (
+          Page,
+          VBox,
+          ODataModel,
+          SmartFilterBar,
+          ControlConfiguration,
+          SmartTable,
+        ) {
+          try {
+            var serviceUrl = smartTableOData.serviceUrl.trim();
+            if (!serviceUrl.endsWith("/")) {
+              serviceUrl = serviceUrl + "/";
+            }
+            var entitySet = smartTableOData.entitySet.trim();
+            var smartFilterColumns = filterColumns.length > 0 ? filterColumns : columns;
+
+            var odataModel = new ODataModel(serviceUrl, {
+              useBatch: false,
+              tokenHandling: false,
+              defaultCountMode: "Inline",
+            });
+            odataModel.attachMetadataFailed(function (event) {
+              notifyParent(
+                preview,
+                "error",
+                "OData metadata load failed: " + String(event.getParameter("message") || ""),
+              );
+            });
+
+            var smartFilterBar = new SmartFilterBar({
+              id: "smartFilterBar",
+              entitySet: entitySet,
+              persistencyKey: "PreviewSmartFilterBar",
+              useToolbar: true,
+              showGoOnFB: true,
+              liveMode: false,
+            });
+            smartFilterColumns.forEach(function (columnMeta, index) {
+              if (!columnMeta || !columnMeta.key) {
+                return;
+              }
+
+              smartFilterBar.addControlConfiguration(
+                new ControlConfiguration({
+                  key: String(columnMeta.key),
+                  label: String((columnMeta.label || columnMeta.key) || ""),
+                  index: index,
+                  visibleInAdvancedArea: true,
+                }),
+              );
+            });
+
+            var smartTable = new SmartTable({
+              id: "smartTable",
+              entitySet: entitySet,
+              smartFilterId: smartFilterBar.getId(),
+              tableType: "ResponsiveTable",
+              header: (preview && preview.name) || "AI Report Preview",
+              useVariantManagement: true,
+              useTablePersonalisation: true,
+              useExportToExcel: true,
+              showRowCount: false,
+              persistencyKey: "PreviewSmartTable",
+              initiallyVisibleFields: columns
+                .map(function (columnMeta) {
+                  return columnMeta && columnMeta.key ? String(columnMeta.key) : "";
+                })
+                .filter(Boolean)
+                .join(","),
+              requestAtLeastFields: columns
+                .map(function (columnMeta) {
+                  return columnMeta && columnMeta.key ? String(columnMeta.key) : "";
+                })
+                .filter(Boolean)
+                .join(","),
+              enableAutoBinding: false,
+            });
+
+            // Ajuste de export para usar os dados mock da sessao de preview.
+            smartTable.attachBeforeExport(function (event) {
+              try {
+                var exportSettings = event.getParameter("exportSettings") || {};
+                var previewItems = Array.isArray(
+                  preview && preview.modelData && preview.modelData.items,
+                )
+                  ? preview.modelData.items
+                  : [];
+
+                exportSettings.workbook = exportSettings.workbook || {};
+                exportSettings.workbook.columns = columns.map(function (columnMeta) {
+                  var columnType = "string";
+                  if (columnMeta && columnMeta.type === "number") {
+                    columnType = "number";
+                  } else if (columnMeta && columnMeta.type === "boolean") {
+                    columnType = "boolean";
+                  } else if (columnMeta && columnMeta.type === "date") {
+                    columnType = "string";
+                  }
+
+                  return {
+                    label: String((columnMeta && (columnMeta.label || columnMeta.key)) || ""),
+                    property: String((columnMeta && columnMeta.key) || ""),
+                    type: columnType,
+                  };
+                });
+                exportSettings.dataSource = previewItems;
+                exportSettings.fileName = ((preview && preview.name) || "report") + ".xlsx";
+                exportSettings.worker = false;
+              } catch (exportError) {
+                notifyParent(
+                  preview,
+                  "error",
+                  "Excel export preparation failed: " + String(exportError),
+                );
+              }
+            });
+
+            smartFilterBar.attachSearch(function () {
+              smartTable.rebindTable(true);
+            });
+
+            var content = new VBox({
+              items: [smartFilterBar, smartTable],
+            });
+            content.addStyleClass("sapUiSmallMargin");
+
+            var page = new Page({
+              title: (preview && preview.name) || "AI Report Preview",
+              content: [content],
+            });
+            page.setModel(odataModel);
+            page.placeAt("content");
+            notifyParent(preview, "ready");
+          } catch (smartTableError) {
+            notifyParent(
+              preview,
+              "error",
+              "SmartTable rendering failed: " + String(smartTableError),
+            );
+          }
+        },
+        function (sapError) {
+          notifyParent(
+            preview,
+            "error",
+            "SmartTable module loading failed: " + String(sapError),
+          );
+        },
+      );
+      return;
+    }
+
+    // Fallback sem OData: gera tabela simples usando JSONModel.
     if (columns.length > 0) {
       sap.ui.require(
         [
@@ -144,6 +319,7 @@
             }
 
             function applyFilters() {
+              // Filtro local no binding da tabela (client-side).
               var binding = table.getBinding("items");
               if (!binding) {
                 return;
@@ -200,6 +376,7 @@
             }
 
             function applyControllerConfig() {
+              // Suporta configuracao declarativa (filtros iniciais/sort).
               if (!controllerConfig || controllerConfig.version !== 1) {
                 return;
               }
@@ -381,6 +558,7 @@
       return;
     }
 
+    // Ultimo fallback: tentar renderizar XMLView recebida diretamente.
     sap.ui.require(
       ["sap/ui/core/mvc/XMLView", "sap/ui/model/json/JSONModel"],
       function (XMLView, JSONModel) {
@@ -420,6 +598,7 @@
   }
 
   function bindUi5AndStart(preview) {
+    // Aguarda bootstrap do UI5 e so depois dispara render do preview.
     function bindUi5Init() {
       if (global.sap && sap.ui && sap.ui.getCore) {
         sap.ui.getCore().attachInit(function () {

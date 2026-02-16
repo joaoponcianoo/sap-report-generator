@@ -8,6 +8,8 @@ interface MapFieldsRequestBody {
 
 export async function POST(req: NextRequest) {
   try {
+    // A rota recebe um prompt simples e devolve apenas o mapping de campos.
+    // O frontend usa esse mapping para montar tabela/filtros no preview.
     const body = (await req.json()) as MapFieldsRequestBody;
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
 
@@ -18,6 +20,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // A escolha entre OpenAI e mock fica centralizada no service.
+    // Assim a rota continua enxuta e sem logica de prompt/mapping.
     const result = await generateFieldMappings({
       prompt: prompt,
       forceMock: body.forceMock === true || process.env.MOCK_AI === "true",
@@ -40,6 +44,7 @@ export async function POST(req: NextRequest) {
       },
     );
   } catch (error) {
+    // Erro inesperado da rota (parse, rede, runtime etc).
     console.error("Error in map-fields API:", error);
     return NextResponse.json(
       { error: "Internal server error" },

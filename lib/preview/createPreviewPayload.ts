@@ -4,6 +4,7 @@ import {
   normalizePreviewControllerConfig,
 } from "@/lib/preview/controllerConfig";
 
+// Payload recebido da UI para construir um preview renderizavel.
 export interface CreatePreviewRequest {
   name?: string;
   fields?: FieldMapping[];
@@ -54,6 +55,7 @@ const DEFAULT_FALLBACK_FIELDS: FieldMapping[] = [
 ];
 
 function sanitizeBindingKey(raw: string): string {
+  // Converte nomes livres para chaves seguras de binding UI5/OData.
   const cleaned = String(raw ?? "").replace(/[^a-zA-Z0-9_]/g, "_");
   if (!cleaned) {
     return "field";
@@ -107,6 +109,7 @@ function resolveFields(
   fieldsInput: CreatePreviewRequest["fields"],
   mockData: CreatePreviewRequest["mockData"],
 ): FieldMapping[] {
+  // 1) Prioriza campos vindos da API de mapping.
   const fieldsFromInput = Array.isArray(fieldsInput)
     ? fieldsInput
         .filter(
@@ -134,6 +137,7 @@ function resolveFields(
     return fieldsFromInput;
   }
 
+  // 2) Se nao houver mapping, tenta inferir pelo primeiro registro mock.
   const firstRow = Array.isArray(mockData) ? mockData.find(isRecord) : null;
   if (firstRow) {
     const inferredFields = Object.keys(firstRow)
@@ -153,6 +157,7 @@ function resolveFields(
     }
   }
 
+  // 3) Fallback final para manter preview funcional.
   return DEFAULT_FALLBACK_FIELDS;
 }
 
@@ -173,6 +178,7 @@ function findValueInRow(
   sourceRow: Record<string, unknown>,
   field: FieldMapping,
 ): unknown {
+  // Busca tolerante por nome de exibicao, nome tecnico e variacao normalizada.
   const bindingKey = sanitizeBindingKey(field.cdsField || field.displayName);
   const directValue =
     sourceRow[field.displayName] ??
@@ -215,6 +221,7 @@ function normalizeRows(
   fields: FieldMapping[],
   mockData: Record<string, unknown>[] | undefined,
 ) {
+  // Sem mockData: gera linhas sinteticas para o preview nao ficar vazio.
   if (!mockData || mockData.length === 0) {
     return Array.from({ length: 8 }, (_, index) => {
       const row: Record<string, unknown> = {};
@@ -238,6 +245,7 @@ function normalizeRows(
 }
 
 function buildDefaultViewXml(fields: FieldMapping[]) {
+  // XML minimo para fallback quando nao houver view XML custom.
   const columns = fields
     .map(
       (field) =>
@@ -275,6 +283,7 @@ ${cells}
 }
 
 function buildPreviewColumns(fields: FieldMapping[]): PreviewColumnMeta[] {
+  // Metadado usado pelo runtime para SmartTable e OData mock.
   return fields.map((field) => ({
     key: sanitizeBindingKey(field.cdsField || field.displayName),
     label: field.displayName,
@@ -283,6 +292,7 @@ function buildPreviewColumns(fields: FieldMapping[]): PreviewColumnMeta[] {
 }
 
 function mergeUniqueFields(...groups: FieldMapping[][]): FieldMapping[] {
+  // Garante uniao de campos de tabela + filtros sem duplicidade.
   const map = new Map<string, FieldMapping>();
 
   groups.flat().forEach((field) => {
@@ -310,6 +320,7 @@ export function buildPreviewPayload(
   }
 
   if (typeof body.controllerJs === "string" && body.controllerJs.trim().length > 0) {
+    // Bloqueio explicito: nada de JS arbitrario vindo do payload.
     return {
       ok: false,
       error:
@@ -334,6 +345,7 @@ export function buildPreviewPayload(
     } as Record<string, unknown>);
 
   if (!hasDirectUi5Content) {
+    // Metadados extras usados pelo runtime para montar SmartFilter/SmartTable.
     generatedModelData.__previewColumns = buildPreviewColumns(fields);
     generatedModelData.__previewFilters = buildPreviewColumns(filterFields);
   }

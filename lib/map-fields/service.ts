@@ -1,5 +1,9 @@
 import type { AgentResponse, FieldMapping, FieldType } from "@/lib/types";
 
+// Fonte usada para gerar o mapping.
+// - openai: resposta valida do modelo
+// - mock: mock intencional (forceMock ou sem API key)
+// - mock_fallback: tentativa OpenAI falhou e caiu para mock
 export type MappingSource = "openai" | "mock" | "mock_fallback";
 
 export interface MappingResult {
@@ -30,6 +34,8 @@ interface OpenAIResponsesApiResponse {
   output?: OpenAIOutputItem[];
 }
 
+// Prompt em ingles padronizado para reduzir ambiguidade.
+// A IA deve retornar somente JSON com campos de negocio.
 const SYSTEM_PROMPT = `You are an SAP CDS field mapping expert.
 
 Goal:
@@ -83,6 +89,7 @@ const OUTPUT_JSON_SCHEMA = {
 
 const FIELD_TYPES: FieldType[] = ["string", "number", "date", "boolean"];
 
+// Fallback minimo para nunca quebrar a tela do usuario.
 const DEFAULT_FIELDS: FieldMapping[] = [
   {
     displayName: "Field 1",
@@ -144,6 +151,8 @@ function toCdsFieldName(value: string): string {
 }
 
 function parseRequestedFields(prompt: string): string[] {
+  // Se houver "with ...", priorizamos esse trecho porque normalmente
+  // ele contem a lista direta de campos.
   const preferredSegment = prompt.match(/\bwith\b([\s\S]*)/i)?.[1] ?? prompt;
   const normalized = preferredSegment
     .replace(/\band\b/gi, ",")
@@ -165,6 +174,7 @@ function parseRequestedFields(prompt: string): string[] {
 }
 
 function buildMockResponse(prompt: string): AgentResponse {
+  // Mock dinamico: tenta transformar o prompt em campos minimamente uteis.
   const names = parseRequestedFields(prompt);
   const fields =
     names.length > 0
@@ -213,6 +223,8 @@ function normalizeWhitespace(value: string): string {
 }
 
 function normalizeAgentResponse(payload: AgentResponse): AgentResponse | null {
+  // Normalizacao defensiva para limpar resposta "quase valida":
+  // remove ruido, duplicados e campos vazios.
   const dedupe = new Set<string>();
   const normalizedFields: FieldMapping[] = [];
 
@@ -254,6 +266,7 @@ function normalizeAgentResponse(payload: AgentResponse): AgentResponse | null {
 }
 
 function cleanJsonResponse(text: string): string {
+  // Modelos podem devolver JSON dentro de markdown.
   return text
     .trim()
     .replace(/```json\n?/g, "")
@@ -261,6 +274,8 @@ function cleanJsonResponse(text: string): string {
 }
 
 function extractTextFromOpenAIResponse(data: unknown): string | null {
+  // A API de Responses pode retornar texto em output_text
+  // ou em output[].content[].text.
   if (!isRecord(data)) {
     return null;
   }
@@ -305,6 +320,7 @@ export async function generateFieldMappings({
 }: GenerateFieldMappingsParams): Promise<MappingResult> {
   const fallbackPayload = buildMockResponse(prompt);
 
+  // Falha "esperada": sem chave ou modo mock ativo.
   if (forceMock || !apiKey) {
     return {
       payload: fallbackPayload,
@@ -342,6 +358,7 @@ export async function generateFieldMappings({
   });
 
   if (!response.ok) {
+    // Em erro HTTP, mantemos UX funcional com fallback.
     const errorData = await response
       .json()
       .catch(() => ({ error: "Unknown OpenAI error" }));

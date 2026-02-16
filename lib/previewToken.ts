@@ -35,6 +35,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getSecret(): string {
+  // Em producao, sempre configure PREVIEW_TOKEN_SECRET.
   return process.env.PREVIEW_TOKEN_SECRET || SECRET_FALLBACK;
 }
 
@@ -56,6 +57,7 @@ export function createPreviewToken(
   payload: PreviewPayload,
   ttlSeconds = DEFAULT_TTL_SECONDS,
 ): string {
+  // Formato: base64url(payload_assinado).assinatura_hmac
   const signedPayload: SignedPreviewPayloadV2 = {
     ...payload,
     v: 2,
@@ -104,6 +106,7 @@ export function parsePreviewToken(token: string): PreviewPayload | null {
     expectedBuffer.length !== actualBuffer.length ||
     !timingSafeEqual(expectedBuffer, actualBuffer)
   ) {
+    // Assinatura invalida.
     return null;
   }
 
@@ -134,6 +137,7 @@ export function parsePreviewToken(token: string): PreviewPayload | null {
       parsed.v === 1 &&
       typeof (parsed as Record<string, unknown>).controllerJs === "string"
     ) {
+      // Compatibilidade legada: payload antigo com controllerJs.
       const legacy = parsed as unknown as SignedPreviewPayloadV1;
       return {
         name: legacy.name,

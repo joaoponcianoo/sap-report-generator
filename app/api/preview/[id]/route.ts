@@ -10,6 +10,9 @@ export async function GET(
   const params = await context.params;
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
+
+  // Primeiro tenta store em memoria, depois token assinado.
+  // Isso deixa o preview resiliente a expurgo da store.
   const fromStore = getPreviewEntry(params.id);
   const fromToken = token ? parsePreviewToken(token) : null;
   const preview = fromStore ?? fromToken;
@@ -23,6 +26,7 @@ export async function GET(
     });
   }
 
+  // O HTML renderizado aqui e consumido no iframe da aplicacao principal.
   const html = buildPreviewHtml(params.id, {
     name: preview.name,
     viewXml: preview.viewXml,

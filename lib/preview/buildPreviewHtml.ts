@@ -8,6 +8,7 @@ export interface PreviewHtmlPayload {
 }
 
 function serializeForInlineScript(payload: unknown): string {
+  // Escapes para reduzir risco de quebrar o <script> inline.
   return JSON.stringify(payload)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")
@@ -30,6 +31,7 @@ export function buildPreviewHtml(
   previewId: string,
   preview: PreviewHtmlPayload,
 ): string {
+  // Payload unico por preview, consumido pelo runtime em /public.
   const payload = serializeForInlineScript({
     previewId,
     ...preview,
@@ -44,12 +46,12 @@ export function buildPreviewHtml(
     <script
       id="sap-ui-bootstrap"
       src="https://ui5.sap.com/resources/sap-ui-core.js"
-      data-sap-ui-libs="sap.m"
+      data-sap-ui-libs="sap.m,sap.ui.comp,sap.ui.table"
       data-sap-ui-theme="sap_horizon"
       data-sap-ui-async="false"
       data-sap-ui-compatVersion="edge">
     </script>
-    <script src="/ui5-preview-runtime.js"></script>
+    <script src="/ui5-preview-runtime.js?v=${escapeHtml(previewId)}"></script>
     <style>
       html, body, #content {
         margin: 0;
@@ -67,6 +69,7 @@ export function buildPreviewHtml(
       const previewPayload = ${payload};
 
       function notifyPreviewRuntimeMissing(preview) {
+        // Se o runtime externo falhar, informamos o app principal via postMessage.
         if (!window.parent) {
           return;
         }

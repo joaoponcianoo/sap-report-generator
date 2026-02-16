@@ -29,6 +29,7 @@ export const DEFAULT_PREVIEW_CONTROLLER: PreviewControllerConfig = {
 export function normalizePreviewControllerConfig(
   input: unknown,
 ): PreviewControllerConfig {
+  // Entrada sempre passa por normalizacao para impedir shape invalido.
   if (!isRecord(input) || input.version !== 1) {
     return { ...DEFAULT_PREVIEW_CONTROLLER };
   }

@@ -24,6 +24,7 @@ interface FieldSelection {
 }
 
 function shouldDefaultAsFilter(field: FieldMapping, index: number): boolean {
+  // Heurística inicial para sugerir filtros úteis sem exigir decisão técnica do usuário.
   const name = `${field.displayName} ${field.cdsField}`.toLowerCase();
   if (field.type === "date" || field.type === "boolean") {
     return true;
@@ -33,6 +34,7 @@ function shouldDefaultAsFilter(field: FieldMapping, index: number): boolean {
 }
 
 function uniqueFields(fields: FieldMapping[]): FieldMapping[] {
+  // Evita enviar campos duplicados para geração de mockData/preview.
   const map = new Map<string, FieldMapping>();
   fields.forEach((field) => {
     const key = `${field.cdsView}|${field.cdsField}|${field.displayName}`;
@@ -88,6 +90,7 @@ export default function Home() {
     index: number,
     patch: Partial<Pick<FieldSelection, "includeInTable" | "includeInFilter">>,
   ) => {
+    // Atualiza apenas o item alterado na grade de mapeamento.
     setSelections((current) =>
       current.map((item, idx) =>
         idx === index ? { ...item, ...patch } : item,
@@ -96,6 +99,7 @@ export default function Home() {
   };
 
   const handleAnalyze = async () => {
+    // Etapa 1: solicita o mapeamento de campos para o backend (IA ou fallback mock).
     if (!prompt.trim()) {
       setError("Please enter a prompt describing your report fields");
       return;
@@ -126,6 +130,7 @@ export default function Home() {
       const data = await response.json();
 
       if (data?._meta?.source && data._meta.source !== "openai") {
+        // Mostra transparência quando a resposta vem de fallback.
         const reason = data?._meta?.reason ? ` (${data._meta.reason})` : "";
         setMappingNotice(
           `Mapping generated via fallback: ${data._meta.source}${reason}.`,
@@ -154,6 +159,7 @@ export default function Home() {
   };
 
   const handleGeneratePreview = async () => {
+    // Etapa 2: cria o preview Fiori com base nas escolhas feitas na tabela de mapping.
     if (!hasMappings) {
       setError("Run field mapping first.");
       return;
@@ -165,6 +171,7 @@ export default function Home() {
     }
 
     const dataFields = uniqueFields([...tableFields, ...filterFields]);
+    // Enquanto não há OData real, a UX é validada com dados mockados.
     const mockData = generateMockData(dataFields, 12);
 
     setGeneratingPreview(true);

@@ -15,6 +15,8 @@ const PREVIEW_TTL_MS = 1000 * 60 * 60;
 type PreviewStore = Map<string, PreviewEntry>;
 
 function getStore(): PreviewStore {
+  // Store em memoria no escopo global do processo Node.
+  // Em dev funciona bem para previews efemeros.
   const globalScope = globalThis as typeof globalThis & {
     __previewStore?: PreviewStore;
   };
@@ -27,6 +29,7 @@ function getStore(): PreviewStore {
 }
 
 function purgeExpiredEntries(store: PreviewStore) {
+  // Limpeza simples por TTL para evitar crescimento indefinido.
   const now = Date.now();
 
   for (const [id, entry] of store.entries()) {
